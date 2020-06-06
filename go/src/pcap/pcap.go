@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,7 +29,6 @@ var (
 	pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
 	handle    *pcap.Handle
 	err       error
-	count     uint64
 )
 
 /* TODO: Make these more official cutoffs. Paper gives good ideas */
@@ -122,6 +122,9 @@ var recentPacketTime map[uint16]time.Time
 
 //ip source to scan sizes
 var scansSizes map[uint16][]int
+var intToIP map[uint16]net.IP
+
+// var destMap map[net.IP]int
 
 // TODO: add map that counts unique ip destinations as well
 // This map counts port destinations, but not ip dests. need both to classify scans and scan size
@@ -228,7 +231,7 @@ func checkMasscan(ipSrc net.IP, ipDest net.IP, dstTCPPort layers.TCPPort, ipId u
 }
 
 func handlePackets(filename string, wg *sync.WaitGroup) {
-	count = 0
+
 	pcapFileInput := filename
 	handle, err = pcap.OpenOffline(pcapFileInput)
 	if err != nil {
@@ -243,16 +246,8 @@ func handlePackets(filename string, wg *sync.WaitGroup) {
 		// We need to skip the first packet so we can calculate a timestamp
 
 		// Increment packet counter
-		mut.Lock()
-		count++
-		mut.Unlock()
 
 		// Nicely prints out which packet we are at in processing
-		mut.Lock()
-		if count%1000000 == 0 {
-			fmt.Printf("%d packets\n", count)
-		}
-		mut.Unlock()
 
 		/*********** Check for Scan ***********/
 		// Then we get the IP information
@@ -282,8 +277,13 @@ func handlePackets(filename string, wg *sync.WaitGroup) {
 			fmt.Println("I didn't want this packet anyways")
 			continue
 		}
+		scanMut.Lock()
+		intToIP[binary.LittleEndian.Uint16(ipSrc)] = ipSrc
+		scanMut.Unlock()
 		packetRateCheck(packet.Metadata().Timestamp, binary.LittleEndian.Uint16(ipSrc), binary.LittleEndian.Uint16(ipDest))
-
+		//scanMut.Lock()
+		//destMap[ipDest]++
+		//scanMut.Unlock()
 		tcpLayer := packet.Layer(layers.LayerTypeTCP)
 
 		// Get Destination port from TCP layer
@@ -332,7 +332,7 @@ func main() {
 	recentPacketTime = make(map[uint16]time.Time)
 	// Open file instead of device
 	scanMap = make(map[uint16]map[uint16]int)
-
+	intToIP = make(map[uint16]net.IP)
 	//ip source to scan sizes
 	scansSizes = make(map[uint16][]int)
 
@@ -345,14 +345,19 @@ func main() {
 	// // } else {
 	// // 	pcapFileInput = pcapFile3
 	var waitGroup sync.WaitGroup
-	waitGroup.Add(1)
+	waitGroup.Add(4)
 
 	go handlePackets(pcapFile, &waitGroup)
-	//go handlePackets(pcapFile1, &waitGroup)
-	//go handlePackets(pcapFile2, &waitGroup)
-	//go handlePackets(pcapFile3, &waitGroup)
+	go handlePackets(pcapFile1, &waitGroup)
+	go handlePackets(pcapFile2, &waitGroup)
+	go handlePackets(pcapFile3, &waitGroup)
 	//START LOOP
 	waitGroup.Wait()
+	fmt.Println("waited")
+
+	for k := range scanMap {
+		packetRateCheck(time.Now(), k, k)
+	}
 
 	/* zmap map printing */
 	/*fzmap, _ := os.Create("zMap.txt")
@@ -364,6 +369,40 @@ func main() {
 		}
 		fzmap.WriteString("\n")
 	}*/
+	scanmap, _ := os.Create("scansSizes.txt")
+	defer scanmap.Close()
+	for k, v := range scansSizes {
+		country := ""
+		ip := intToIP[k].String()
+		/*baseURL := "http://api.ipstack.com/"
+		accessKey := "?access_key=f9a249849c21e7c176b8e9d4d1cca750"
+		//get access key from api.ipstack.com
+		requestStr := baseURL + ip + accessKey
+		country := ""
+		response, err := http.Get(requestStr)
+		if err != nil {
+			fmt.Printf("The HTTP request failed with error %s\n", err)
+		} else {
+			data, _ := ioutil.ReadAll(response.Body)
+			dataStr := string(data)
+			indexOfCountry := strings.Index(dataStr, "\"country_name\":\"")
+			if indexOfCountry != -1 {
+				indexOfCountry += 16
+				endOfCountry := strings.Index(dataStr[indexOfCountry:], "\"")
+				endOfCountry += indexOfCountry
+				country = dataStr[indexOfCountry:endOfCountry]
+			}
+		}*/
+		// need to pull country from here
+		scanmap.WriteString("SrcIP: " + ip + ", Country: " + country + "\n")
+		countString := fmt.Sprintf("%d\n", v)
+		scanmap.WriteString(countString)
+		scanmap.WriteString("\n")
+	}
+	/*
+		File Format:
+		SourceIP, Country, Scan Count, SIZES
+	*/
 
 	/* Format of scanMap:
 	ip source -> ip destination -> count
@@ -372,14 +411,25 @@ func main() {
 		ip source -> list of scan sizes
 
 	*/
-	for k := range scanMap {
+	/*for k := range scanMap {
+		fmt.Printf("ipsource: %d\n", k)
+		for k1, v := range scanMap[k] {
+			fmt.Printf("\tipdest: %d, num: %d\n", k1, v)
+		}
 		packetRateCheck(time.Now(), k, k)
+	}*/
+	/*numDestinations := 0
+	numPackets := 0
+	for _, v := range destMap {
+		numDestinations++
+		numPackets += v
 	}
+	fmt.Printf("num: %d, packets: %d\n", numDestinations, numPackets)*/
 
 	fmt.Println("got here")
-	for k, v := range scansSizes {
-		fmt.Printf("source: %s, count: %d\n", strconv.Itoa(int(k)), v)
-	}
+	//for k, v := range scansSizes {
+	//fmt.Printf("source: %s, count: %d\n", strconv.Itoa(int(k)), v)
+	//}
 	fmt.Println("and got here")
 
 	/*
@@ -399,5 +449,5 @@ func main() {
 
 	/* End of nothing stats */
 
-	fmt.Printf("Total packets: %d", count)
+	//fmt.Printf("Total packets: %d", count)
 }
