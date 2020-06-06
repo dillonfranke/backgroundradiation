@@ -8,7 +8,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	//"sync/atomic"
@@ -29,6 +28,7 @@ var (
 	pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
 	handle    *pcap.Handle
 	err       error
+	count     int
 )
 
 /* TODO: Make these more official cutoffs. Paper gives good ideas */
@@ -128,16 +128,11 @@ var intToIP map[uint16]net.IP
 
 // TODO: add map that counts unique ip destinations as well
 // This map counts port destinations, but not ip dests. need both to classify scans and scan size
-//var zMapMapConcurrent sync.Map
-var scanMut sync.Mutex
-var zmapMut sync.Mutex
-var massMut sync.Mutex
-var mut sync.Mutex
+//var zMapMapConcurrent sync.Map\
 
 /* ========================= Main Loop ========================== */
 
 func packetRateCheck(recent time.Time, ipSrc uint16, ipDest uint16) {
-	scanMut.Lock()
 	previousPacket := recentPacketTime[ipSrc]
 	oldestPacket := firstPacketTime[ipSrc]
 	allDests := scanMap[ipSrc]
@@ -148,10 +143,8 @@ func packetRateCheck(recent time.Time, ipSrc uint16, ipDest uint16) {
 		newDestMap := make(map[uint16]int)
 		newDestMap[ipDest] = 1
 		scanMap[ipSrc] = newDestMap
-		scanMut.Unlock()
 		return
 	}
-	scanMut.Unlock()
 	difference := recent.Sub(previousPacket)
 	expireTime, err := time.ParseDuration("480s")
 	if err != err {
@@ -160,11 +153,9 @@ func packetRateCheck(recent time.Time, ipSrc uint16, ipDest uint16) {
 
 	longDifference := int(recent.Sub(oldestPacket))
 	numPackets := 0
-	scanMut.Lock()
 	for _, v := range allDests {
 		numPackets += v
 	}
-	scanMut.Unlock()
 	average := float64(numPackets) / (float64(longDifference) / float64(10e9))
 	//fmt.Printf("average: %e, longDifference: %d, numPackets: %d\n", average, longDifference, numPackets)
 	if (float64(difference)) >= float64(expireTime) || average < SLOWEST_RATE {
@@ -175,7 +166,6 @@ func packetRateCheck(recent time.Time, ipSrc uint16, ipDest uint16) {
 			//fmt.Printf("average: %e\n", average)
 		}*/
 		// this scan is expiring
-		scanMut.Lock()
 		totalPackets := 0
 		for range allDests {
 			totalPackets++
@@ -189,17 +179,14 @@ func packetRateCheck(recent time.Time, ipSrc uint16, ipDest uint16) {
 		newDestMap[ipDest] = 1
 		scanMap[ipSrc] = newDestMap
 	} else {
-		scanMut.Lock()
 		recentPacketTime[ipSrc] = recent
 		scanMap[ipSrc][ipDest]++
 	}
-	scanMut.Unlock()
 }
 
 func checkZMap(ipSrc net.IP, dstTCPPort layers.TCPPort, ipId uint16) {
 	if ipId == 54321 {
 		// We've found a new ipSrc, and it might be part of a new scan
-		zmapMut.Lock()
 		if zMapMap[binary.LittleEndian.Uint16(ipSrc)] == nil {
 			newIPEntry := make(map[int]int)
 			newIPEntry[int(dstTCPPort)] = 1
@@ -207,7 +194,6 @@ func checkZMap(ipSrc net.IP, dstTCPPort layers.TCPPort, ipId uint16) {
 		} else { // We're adding to scan data
 			zMapMap[binary.LittleEndian.Uint16(ipSrc)][int(dstTCPPort)]++
 		}
-		zmapMut.Unlock()
 	}
 }
 
@@ -218,7 +204,6 @@ func checkMasscan(ipSrc net.IP, ipDest net.IP, dstTCPPort layers.TCPPort, ipId u
 
 	if ipId == uint16(fingerprint) {
 		// We've found a new ipSrc, and it might be part of a new scan
-		massMut.Lock()
 		if masscanMap[binary.LittleEndian.Uint16(ipSrc)] == nil {
 			newIPEntry := make(map[int]int)
 			newIPEntry[int(dstTCPPort)] = 1
@@ -226,11 +211,10 @@ func checkMasscan(ipSrc net.IP, ipDest net.IP, dstTCPPort layers.TCPPort, ipId u
 		} else { // We're adding to scan data
 			masscanMap[binary.LittleEndian.Uint16(ipSrc)][int(dstTCPPort)]++
 		}
-		massMut.Unlock()
 	}
 }
 
-func handlePackets(filename string, wg *sync.WaitGroup) {
+func handlePackets(filename string) {
 
 	pcapFileInput := filename
 	handle, err = pcap.OpenOffline(pcapFileInput)
@@ -242,11 +226,14 @@ func handlePackets(filename string, wg *sync.WaitGroup) {
 	// Loop through packets in file
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range packetSource.Packets() {
+		count++
 		//fmt.Printf("loop")
 		// We need to skip the first packet so we can calculate a timestamp
 
 		// Increment packet counter
-
+		if count%1000000 == 0 {
+			fmt.Printf("%d packets\n", count)
+		}
 		// Nicely prints out which packet we are at in processing
 
 		/*********** Check for Scan ***********/
@@ -277,13 +264,8 @@ func handlePackets(filename string, wg *sync.WaitGroup) {
 			fmt.Println("I didn't want this packet anyways")
 			continue
 		}
-		scanMut.Lock()
 		intToIP[binary.LittleEndian.Uint16(ipSrc)] = ipSrc
-		scanMut.Unlock()
 		packetRateCheck(packet.Metadata().Timestamp, binary.LittleEndian.Uint16(ipSrc), binary.LittleEndian.Uint16(ipDest))
-		//scanMut.Lock()
-		//destMap[ipDest]++
-		//scanMut.Unlock()
 		tcpLayer := packet.Layer(layers.LayerTypeTCP)
 
 		// Get Destination port from TCP layer
@@ -315,7 +297,7 @@ func handlePackets(filename string, wg *sync.WaitGroup) {
 		*/
 
 	}
-	wg.Done()
+	//wg.Done()
 }
 
 /* TODO:
@@ -325,7 +307,7 @@ Use these structs to try to build the nonTCP versions of all functions
 
 func main() {
 
-	//count = 0
+	count = 0
 	zMapMap = make(map[uint16]map[int]int)
 	masscanMap = make(map[uint16]map[int]int)
 	firstPacketTime = make(map[uint16]time.Time)
@@ -344,15 +326,14 @@ func main() {
 	// // 	pcapFileInput = pcapFile2
 	// // } else {
 	// // 	pcapFileInput = pcapFile3
-	var waitGroup sync.WaitGroup
-	waitGroup.Add(4)
+	//waitGroup.Add(1)
 
-	go handlePackets(pcapFile, &waitGroup)
-	go handlePackets(pcapFile1, &waitGroup)
-	go handlePackets(pcapFile2, &waitGroup)
-	go handlePackets(pcapFile3, &waitGroup)
+	handlePackets(pcapFile)
+	handlePackets(pcapFile1)
+	handlePackets(pcapFile2)
+	handlePackets(pcapFile3)
 	//START LOOP
-	waitGroup.Wait()
+	//waitGroup.Wait()
 	fmt.Println("waited")
 
 	for k := range scanMap {
