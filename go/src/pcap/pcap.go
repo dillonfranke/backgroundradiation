@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -17,18 +18,25 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
+type ScanInfo struct {
+	SrcIp   string
+	Country string
+	Number  int
+	Scans   []int
+}
+
 var (
 	//pcapFile string = "/Users/dillonfranke/Downloads/2018-10-30.00.pcap"
 	// pcapFile1 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.01.pcap"
 	//pcapFile1 string = "/Users/dillonfranke/Downloads/2018-10-30.01.pcap"
 	// pcapFile3 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.03.pcap"
-	pcapFile  string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.00.pcap"
-	pcapFile1 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.01.pcap"
-	pcapFile2 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.02.pcap"
-	pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
-	handle    *pcap.Handle
-	err       error
-	count     int
+	pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
+	// pcapFile1 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.01.pcap"
+	// pcapFile2 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.02.pcap"
+	// pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
+	handle *pcap.Handle
+	err    error
+	count  int
 )
 
 /* TODO: Make these more official cutoffs. Paper gives good ideas */
@@ -332,8 +340,6 @@ func main() {
 	handlePackets(pcapFile1)
 	handlePackets(pcapFile2)
 	handlePackets(pcapFile3)
-	//START LOOP
-	//waitGroup.Wait()
 	fmt.Println("waited")
 
 	for k := range scanMap {
@@ -353,8 +359,13 @@ func main() {
 	scanmap, _ := os.Create("scansSizes.txt")
 	defer scanmap.Close()
 	for k, v := range scansSizes {
-		country := ""
-		ip := intToIP[k].String()
+		scaninfo := &ScanInfo{}
+		scaninfo.Number = len(v)
+		scaninfo.Scans = v
+		scaninfo.SrcIp = intToIP[k].String()
+		scaninfo.Country = ""
+		// country := ""
+		// ip := intToIP[k].String()
 		/*baseURL := "http://api.ipstack.com/"
 		accessKey := "?access_key=f9a249849c21e7c176b8e9d4d1cca750"
 		//get access key from api.ipstack.com
@@ -375,10 +386,12 @@ func main() {
 			}
 		}*/
 		// need to pull country from here
-		scanmap.WriteString("SrcIP: " + ip + ", Country: " + country + "\n")
-		countString := fmt.Sprintf("%d\n", v)
-		scanmap.WriteString(countString)
-		scanmap.WriteString("\n")
+		res, err := json.Marshal(scaninfo)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		scanmap.WriteString(string(res))
 	}
 	/*
 		File Format:
