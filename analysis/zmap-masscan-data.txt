@@ -1,0 +1,9 @@
+zMap    >10% (8 or more hits): 770
+masscan >10% (8 or more hits): 10
+
+zMap    >50% (40 or more hits): 701
+masscan >50% (40 or more hits): 0
+
+zMap    >50% (50 or more hits): 684
+
+zMap    >50% (100 or more hits): 600
