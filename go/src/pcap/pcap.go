@@ -249,10 +249,6 @@ func handlePackets(filename string) {
 		}
 		// Nicely prints out which packet we are at in processing
 
-		if count == 1000000 {
-			break
-		}
-
 		/*********** Check for Scan ***********/
 		// Then we get the IP information
 		// Get IPv4 Layer
