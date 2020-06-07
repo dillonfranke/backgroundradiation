@@ -47,8 +47,8 @@ var (
 	// pcapFile1 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.01.pcap"
 	//pcapFile1 string = "/Users/dillonfranke/Downloads/2018-10-30.01.pcap"
 	// pcapFile3 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.03.pcap"
-	//pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
-	pcapFile string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.00.pcap"
+	pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
+	// pcapFile string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.00.pcap"
 	// pcapFile1 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.01.pcap"
 	// pcapFile2 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.02.pcap"
 	// pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
@@ -259,7 +259,7 @@ func handlePackets(filename string) {
 		ipLayer := packet.Layer(layers.LayerTypeIPv4)
 		var ipSrc net.IP
 		var ipDest net.IP
-		//var ipId uint16
+		var ipId uint16
 
 		// HAS AN IP LAYER
 		if ipLayer != nil {
@@ -273,7 +273,7 @@ func handlePackets(filename string) {
 			//fmt.Printf("Source IP: %s\n", ip.SrcIP)
 			//fmt.Printf("Destin IP: %s\n", ip.DstIP)
 			//fmt.Printf("Protocol: %s\n", ip.Protocol)
-			//ipId = ip.Id
+			ipId = ip.Id
 			ipSrc = ip.SrcIP
 			ipDest = ip.DstIP
 
@@ -289,9 +289,9 @@ func handlePackets(filename string) {
 			tcp, _ := tcpLayer.(*layers.TCP)
 			var dstTCPPort = tcp.DstPort
 			packetRateCheck(packet.Metadata().Timestamp, binary.LittleEndian.Uint16(ipSrc), binary.LittleEndian.Uint16(ipDest), uint32(dstTCPPort))
-			/******** zMap Check *********/
-			//checkZMap(ipSrc, dstTCPPort, ipId)
-			//checkMasscan(ipSrc, ipDest, dstTCPPort, ipId, tcp.Seq)
+			/******** zMap + masscan Check *********/
+			checkZMap(ipSrc, dstTCPPort, ipId)
+			checkMasscan(ipSrc, ipDest, dstTCPPort, ipId, tcp.Seq)
 		}
 
 		/*
@@ -374,7 +374,7 @@ func main() {
 
 		masscaninfo.Ports = ports
 
-		res, err := json.Marshal(masscaninfo)
+		res, err := json.MarshalIndent(masscaninfo, "", "    ")
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -400,7 +400,7 @@ func main() {
 
 		zmapinfo.Ports = ports
 
-		res, err := json.Marshal(zmapinfo)
+		res, err := json.MarshalIndent(zmapinfo, "", "    ")
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -438,7 +438,7 @@ func main() {
 			}
 		}*/
 		// need to pull country from here
-		res, err := json.Marshal(scaninfo)
+		res, err := json.MarshalIndent(scaninfo, "", "    ")
 		if err != nil {
 			fmt.Println(err)
 			return
