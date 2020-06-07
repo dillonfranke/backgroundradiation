@@ -47,11 +47,11 @@ var (
 	// pcapFile1 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.01.pcap"
 	//pcapFile1 string = "/Users/dillonfranke/Downloads/2018-10-30.01.pcap"
 	// pcapFile3 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.03.pcap"
-	pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
-	// pcapFile string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.00.pcap"
-	// pcapFile1 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.01.pcap"
-	// pcapFile2 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.02.pcap"
-	// pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
+	// pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
+	pcapFile string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.00.pcap"
+	pcapFile1 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.01.pcap"
+	pcapFile2 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.02.pcap"
+	pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
 	handle *pcap.Handle
 	err    error
 	count  int
@@ -347,9 +347,9 @@ func main() {
 	//waitGroup.Add(1)
 
 	handlePackets(pcapFile)
-	// handlePackets(pcapFile1)
-	// handlePackets(pcapFile2)
-	// handlePackets(pcapFile3)
+	handlePackets(pcapFile1)
+	handlePackets(pcapFile2)
+	handlePackets(pcapFile3)
 	fmt.Println("waited")
 
 	for k := range scanMap {
