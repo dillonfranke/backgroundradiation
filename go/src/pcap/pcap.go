@@ -30,13 +30,14 @@ var (
 	// pcapFile1 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.01.pcap"
 	//pcapFile1 string = "/Users/dillonfranke/Downloads/2018-10-30.01.pcap"
 	// pcapFile3 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.03.pcap"
-	pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
-	// pcapFile1 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.01.pcap"
-	// pcapFile2 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.02.pcap"
-	// pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
-	handle *pcap.Handle
-	err    error
-	count  int
+	// pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
+	pcapFile  string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.00.pcap"
+	pcapFile1 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.01.pcap"
+	pcapFile2 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.02.pcap"
+	pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
+	handle    *pcap.Handle
+	err       error
+	count     int
 )
 
 /* TODO: Make these more official cutoffs. Paper gives good ideas */
@@ -64,35 +65,6 @@ func getCount(thing string) uint16 {
 func stringifyNot(srcIP string, dstIP string, dPort string) string {
 	return srcIP + ";" + dstIP + ";" + dPort
 }
-
-/* Serializes the flags, if needed */
-/*
-func stringifyFlags(SYN bool, FIN bool, ACK bool, RST bool) string {
-     result := ""
-     if SYN {
-        result += "1"
-     } else {
-        result += "0"
-     }
-     if FIN {
-        result += "1"
-     } else {
-        result += "0"
-     }
-     if ACK {
-        result += "1"
-     } else {
-        result += "0"
-     }
-     if RST {
-        result += "1"
-     } else {
-        result += "0"
-     }
-     return result
-}
-
-*/
 
 /* Takes inputs as they are found in the packet, to create "srcIP;dstIP;dPort" */
 func stringify(srcIP net.IP, dstIP net.IP, dPort uint16) string {
@@ -125,11 +97,14 @@ var zMapMap map[uint16]map[int]int
 var masscanMap map[uint16]map[int]int
 
 var scanMap map[uint16]map[uint16]int
+var scanPortMap map[uint16]map[uint32]int
+
 var firstPacketTime map[uint16]time.Time
 var recentPacketTime map[uint16]time.Time
 
 //ip source to scan sizes
 var scansSizes map[uint16][]int
+var scanPorts map[uint16][][]uint32
 var intToIP map[uint16]net.IP
 
 // var destMap map[net.IP]int
@@ -140,7 +115,7 @@ var intToIP map[uint16]net.IP
 
 /* ========================= Main Loop ========================== */
 
-func packetRateCheck(recent time.Time, ipSrc uint16, ipDest uint16) {
+func packetRateCheck(recent time.Time, ipSrc uint16, ipDest uint16, destPort uint32) {
 	previousPacket := recentPacketTime[ipSrc]
 	oldestPacket := firstPacketTime[ipSrc]
 	allDests := scanMap[ipSrc]
@@ -151,6 +126,9 @@ func packetRateCheck(recent time.Time, ipSrc uint16, ipDest uint16) {
 		newDestMap := make(map[uint16]int)
 		newDestMap[ipDest] = 1
 		scanMap[ipSrc] = newDestMap
+		newPortMap := make(map[uint32]int)
+		newPortMap[destPort] = 1
+		scanPortMap[ipSrc] = newPortMap
 		return
 	}
 	difference := recent.Sub(previousPacket)
@@ -180,15 +158,26 @@ func packetRateCheck(recent time.Time, ipSrc uint16, ipDest uint16) {
 		}
 		if totalPackets >= SCAN_CUTOFF {
 			scansSizes[ipSrc] = append(scansSizes[ipSrc], totalPackets)
+
+			var scanPorts map[uint16][][]uint32
+			var allPorts []uint32
+			for k := range scanPortMap[ipSrc] {
+				allPorts = append(allPorts, k)
+			}
+			scanPorts[ipSrc] = append(scanPorts[ipSrc], allPorts)
 		}
 		recentPacketTime[ipSrc] = recent
 		firstPacketTime[ipSrc] = recent
 		newDestMap := make(map[uint16]int)
 		newDestMap[ipDest] = 1
 		scanMap[ipSrc] = newDestMap
+		newPortMap := make(map[uint32]int)
+		newPortMap[destPort] = 1
+		scanPortMap[ipSrc] = newPortMap
 	} else {
 		recentPacketTime[ipSrc] = recent
 		scanMap[ipSrc][ipDest]++
+		scanPortMap[ipSrc][destPort]++
 	}
 }
 
@@ -273,14 +262,13 @@ func handlePackets(filename string) {
 			continue
 		}
 		intToIP[binary.LittleEndian.Uint16(ipSrc)] = ipSrc
-		packetRateCheck(packet.Metadata().Timestamp, binary.LittleEndian.Uint16(ipSrc), binary.LittleEndian.Uint16(ipDest))
 		tcpLayer := packet.Layer(layers.LayerTypeTCP)
 
 		// Get Destination port from TCP layer
 		if tcpLayer != nil {
-			//tcp, _ := tcpLayer.(*layers.TCP)
-			//var dstTCPPort = tcp.DstPort
-
+			tcp, _ := tcpLayer.(*layers.TCP)
+			var dstTCPPort = tcp.DstPort
+			packetRateCheck(packet.Metadata().Timestamp, binary.LittleEndian.Uint16(ipSrc), binary.LittleEndian.Uint16(ipDest), uint32(dstTCPPort))
 			/******** zMap Check *********/
 			//checkZMap(ipSrc, dstTCPPort, ipId)
 			//checkMasscan(ipSrc, ipDest, dstTCPPort, ipId, tcp.Seq)
@@ -343,7 +331,7 @@ func main() {
 	fmt.Println("waited")
 
 	for k := range scanMap {
-		packetRateCheck(time.Now(), k, k)
+		packetRateCheck(time.Now(), k, k, 0)
 	}
 
 	/* zmap map printing */
