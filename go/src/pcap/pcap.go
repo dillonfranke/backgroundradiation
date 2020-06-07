@@ -25,16 +25,33 @@ type ScanInfo struct {
 	Scans   []int
 }
 
+type Port struct {
+	Port int
+	Hits int
+}
+
+type ZmapInfo struct {
+	SrcIp   string
+	Ports 	[]Port
+	Hits	int
+}
+
+type MasscanInfo struct {
+	SrcIp   string
+	Ports 	[]Port
+	Hits	int
+}
+
 var (
 	//pcapFile string = "/Users/dillonfranke/Downloads/2018-10-30.00.pcap"
 	// pcapFile1 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.01.pcap"
 	//pcapFile1 string = "/Users/dillonfranke/Downloads/2018-10-30.01.pcap"
 	// pcapFile3 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.03.pcap"
-	// pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
-	pcapFile  string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.00.pcap"
-	pcapFile1 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.01.pcap"
-	pcapFile2 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.02.pcap"
-	pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
+	pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
+	// pcapFile  string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.00.pcap"
+	// pcapFile1 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.01.pcap"
+	// pcapFile2 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.02.pcap"
+	// pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
 	handle    *pcap.Handle
 	err       error
 	count     int
@@ -233,6 +250,10 @@ func handlePackets(filename string) {
 		}
 		// Nicely prints out which packet we are at in processing
 
+		if count == 1000000 {
+			break
+		}
+
 		/*********** Check for Scan ***********/
 		// Then we get the IP information
 		// Get IPv4 Layer
@@ -311,6 +332,8 @@ func main() {
 	// Open file instead of device
 	scanMap = make(map[uint16]map[uint16]int)
 	intToIP = make(map[uint16]net.IP)
+	scanPortMap = make(map[uint16]map[uint32]int)
+	scanPorts = make(map[uint16][][]uint32)
 	//ip source to scan sizes
 	scansSizes = make(map[uint16][]int)
 
@@ -325,25 +348,67 @@ func main() {
 	//waitGroup.Add(1)
 
 	handlePackets(pcapFile)
-	handlePackets(pcapFile1)
-	handlePackets(pcapFile2)
-	handlePackets(pcapFile3)
+	// handlePackets(pcapFile1)
+	// handlePackets(pcapFile2)
+	// handlePackets(pcapFile3)
 	fmt.Println("waited")
 
 	for k := range scanMap {
 		packetRateCheck(time.Now(), k, k, 0)
 	}
 
+	/* masscan map printing */
+	fmasscan, _ := os.Create("masscan.txt")
+	defer fmasscan.Close()
+	for k, v := range masscanMap {
+
+		masscaninfo := &MasscanInfo{}
+		masscaninfo.SrcIp = intToIP[k].String()
+
+		var ports []Port
+		for i, j := range v {
+			port := Port{}
+			port.Port = i
+			port.Hits = j
+			ports = append(ports, port)
+		}
+
+		masscaninfo.Ports = ports
+
+		res, err := json.Marshal(masscaninfo)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmasscan.WriteString(string(res))
+	}
+
 	/* zmap map printing */
-	/*fzmap, _ := os.Create("zMap.txt")
+	fzmap, _ := os.Create("zMap.txt")
 	defer fzmap.Close()
 	for k, v := range zMapMap {
-		fzmap.WriteString("SrcIP: " + strconv.Itoa(int(k)) + "\n")
+
+		zmapinfo := &ZmapInfo{}
+		zmapinfo.SrcIp = intToIP[k].String()
+
+		var ports []Port
 		for i, j := range v {
-			fzmap.WriteString("\tPort: " + strconv.Itoa(int(i)) + "-->" + strconv.Itoa(int(j)) + "\n")
+			port := Port{}
+			port.Port = i
+			port.Hits = j
+			ports = append(ports, port)
 		}
-		fzmap.WriteString("\n")
-	}*/
+
+		zmapinfo.Ports = ports
+
+		res, err := json.Marshal(zmapinfo)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fzmap.WriteString(string(res))
+	}
+
 	scanmap, _ := os.Create("scansSizes.txt")
 	defer scanmap.Close()
 	for k, v := range scansSizes {
