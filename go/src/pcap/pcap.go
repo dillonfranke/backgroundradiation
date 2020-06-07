@@ -31,15 +31,15 @@ type Port struct {
 }
 
 type ZmapInfo struct {
-	SrcIp   string
-	Ports 	[]Port
-	Hits	int
+	SrcIp string
+	Ports []Port
+	Hits  int
 }
 
 type MasscanInfo struct {
-	SrcIp   string
-	Ports 	[]Port
-	Hits	int
+	SrcIp string
+	Ports []Port
+	Hits  int
 }
 
 var (
@@ -47,14 +47,14 @@ var (
 	// pcapFile1 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.01.pcap"
 	//pcapFile1 string = "/Users/dillonfranke/Downloads/2018-10-30.01.pcap"
 	// pcapFile3 string = "/Volumes/SANDISK256/PCap_Data/2018-10-30.03.pcap"
-	pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
-	// pcapFile  string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.00.pcap"
+	//pcapFile string = "/Volumes/SANDISK256/2018-10-30.00.pcap"
+	pcapFile string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.00.pcap"
 	// pcapFile1 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.01.pcap"
 	// pcapFile2 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.02.pcap"
 	// pcapFile3 string = "/Users/wilhemkautz/Documents/classes/cs244/2018-10-30.03.pcap"
-	handle    *pcap.Handle
-	err       error
-	count     int
+	handle *pcap.Handle
+	err    error
+	count  int
 )
 
 /* TODO: Make these more official cutoffs. Paper gives good ideas */
@@ -176,7 +176,6 @@ func packetRateCheck(recent time.Time, ipSrc uint16, ipDest uint16, destPort uin
 		if totalPackets >= SCAN_CUTOFF {
 			scansSizes[ipSrc] = append(scansSizes[ipSrc], totalPackets)
 
-			var scanPorts map[uint16][][]uint32
 			var allPorts []uint32
 			for k := range scanPortMap[ipSrc] {
 				allPorts = append(allPorts, k)
