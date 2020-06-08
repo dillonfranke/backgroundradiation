@@ -4,23 +4,35 @@ import collections
 
 
 country_map = {}
+port_counts = {}
+
+def safe_get(list, index):
+    try:
+        return list[index]
+    except IndexError:
+        return None
 
 def ppjson(obj):
     print(json.dumps(obj, indent=2))
 
 if __name__ == "__main__":
     # Country analysis
-    f = open('go/src/pcap/ipcountriestest.json', 'r')
-    countries = json.load(f)
+    f = open('go/src/pcap/scansSizesPorts.json', 'r')
+    data = json.load(f)
 
-    for entry in countries:
-        srcip = entry['srcip']
-        country = entry['country']
+    for entry in data:
+        srcip = entry['SrcIp']
+        number = entry['Number']
+        scans = entry['Scans']
+        ports = entry['Ports']
+        for arr in ports:
+            for port in arr:
+                if port_counts.get(port) is None:
+                    port_counts[port] = 1
+                else:
+                    port_counts[port] += 1
 
-        if country_map.get(country) is None:
-            country_map[country] = 1
-        else:
-            country_map[country] += 1
+        
 
-    country_map = collections.OrderedDict(sorted(country_map.items(), key=lambda i: i[1], reverse=True))
-    ppjson(country_map)
+    port_counts = collections.OrderedDict(sorted(port_counts.items(), key=lambda i: i[1], reverse=True))
+    ppjson(port_counts)
