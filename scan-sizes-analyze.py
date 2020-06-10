@@ -59,37 +59,33 @@ if __name__ == "__main__":
         country = country_map[srcip]
 
         
+        for i in range(len(scans)):
+            # Filtering to get only large scans 
+            # if scans[i] >= 8:
+                targeted_ports = ports[i]
+                for port in targeted_ports:
+                    if large_scan_port_counts_by_country.get(port) is None:
+                        large_scan_port_counts_by_country[port] = 1
+                    else:
+                        large_scan_port_counts_by_country[port] += 1
+
         # for i in range(len(scans)):
         #     # Filtering to get only large scans 
         #     if scans[i] >= 8:
-        #         targeted_ports = ports[i]
-        #         for port in targeted_ports:
-        #             if str(port) not in port_mappings.keys():
-        #                 continue
-        #             if large_scan_port_counts_by_country.get(port) is None:
-        #                 large_scan_port_counts_by_country[port] = {}
-        #                 large_scan_port_counts_by_country[port][country] = 1
-        #             elif large_scan_port_counts_by_country.get(port).get(country) is None:
-        #                 large_scan_port_counts_by_country[port][country] = 1
-        #             else:
-        #                 large_scan_port_counts_by_country[port][country] += 1
-
-        for i in range(len(scans)):
-            # Filtering to get only large scans 
-            if scans[i] >= 8:
-                if country_frequencies.get(country) is None:
-                    country_frequencies[country] = 1
-                else:
-                    country_frequencies[country] += 1
+        #         if country_frequencies.get(country) is None:
+        #             country_frequencies[country] = 1
+        #         else:
+        #             country_frequencies[country] += 1
 
 
 
         
     # print(large_scan_port_counts_by_country)
-    # ppjson(large_scan_port_counts_by_country)
+    large_scan_port_counts_by_country = sorted(large_scan_port_counts_by_country.items(), key=lambda i: i[1], reverse=True)
+    ppjson(large_scan_port_counts_by_country)
     # large_scan_port_counts_by_country = sorted(large_scan_port_counts_by_country.items(), key=sortlio, reverse=True)
-    country_frequencies = collections.OrderedDict(sorted(country_frequencies.items(), key=lambda i: i[1], reverse=True))
-    ppjson(country_frequencies)
+    # country_frequencies = collections.OrderedDict(sorted(country_frequencies.items(), key=lambda i: i[1], reverse=True))
+    # ppjson(country_frequencies)
     # top_ports = []
     # for key, value in large_scan_port_counts_by_country.items():
     #     maximum = 0
